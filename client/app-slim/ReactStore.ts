@@ -838,7 +838,7 @@ function updatePost(post: Post, pageId: PageId, isCollapsing?: boolean) {
     if (!alreadyIncl) {
       page.progressPostNrsSorted.push(post.nr);
       sortPostNrsInPlace(
-          // Progress posts are always sorted by time.
+          // Progress posts are always sorted by time. [PROGRTIME]
           page.progressPostNrsSorted, page.postsByNr, PostSortOrder.OldestFirst);
     }
   }

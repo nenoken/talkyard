@@ -239,11 +239,8 @@ class JsonMaker(dao: SiteDao) {
 
     val numPostsExclTitle = numPosts - (if (pageParts.titlePost.isDefined) 1 else 0)
 
-    val parentlessReplies = pageParts.parentlessRepliesSorted
     val parentlessReplyNrsSorted =
-      parentlessReplies.map(reply => JsNumber(reply.nr))
-      // Not needed?: Post.sortPosts(parentlessReplies).map(reply => JsNumber(reply.nr))
-      // — already sorted??!!
+      pageParts.parentlessRepliesSorted.map(reply => JsNumber(reply.nr))
 
     if (page.pageType == PageType.EmbeddedComments) {
       allPostsJson +:=
@@ -251,9 +248,8 @@ class JsonMaker(dao: SiteDao) {
           embeddedCommentsDummyRootPost(parentlessReplyNrsSorted)
     }
 
-    val progressPosts = pageParts.progressPosts
     val progressPostNrsSorted =
-      Post.sortPosts(progressPosts, PostSortOrder.OldestFirst).map(reply => JsNumber(reply.nr))
+      pageParts.progressPostsSorted.map(reply => JsNumber(reply.nr))
 
     val (anyForumId: Option[PageId], ancestorsJsonRootFirst: Seq[JsObject]) =
       makeForumIdAndAncestorsJson(page.meta)

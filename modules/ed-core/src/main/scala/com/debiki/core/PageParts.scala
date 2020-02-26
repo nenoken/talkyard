@@ -41,7 +41,7 @@ object PageParts {
 
   val NoNr: Int = -1   // would be good to change to 0 instead [4WKBA20]
 
-  val MaxTitleLength = 200
+  val MaxTitleLength = 200  // sync with e2e tests
 
   def isArticleOrTitlePostNr(nr: PostNr): Boolean =
     nr == PageParts.BodyNr || nr == PageParts.TitleNr
@@ -86,8 +86,10 @@ case class PreLoadedPageParts(
   override val postsOrderNesting: PostsOrderNesting = PostsOrderNesting.Default)
   extends PageParts {
 
+  require(pageMeta.pageId != NoPageId || allPosts.isEmpty, "TyE3J05WKDT5")
+
   def pageId: PageId = pageMeta.pageId
-  def exists: Boolean = pageMeta.pageId != NoPageId  // ???
+  def exists: Boolean = pageMeta.pageId != NoPageId
 }
 
 
@@ -156,10 +158,13 @@ abstract class PageParts {
   def parentlessRepliesSorted: immutable.Seq[Post] =
     childrenSortedByParentNr.getOrElse(PageParts.NoNr, Nil)
 
-  def progressPosts: immutable.Seq[Post] =
-    allPosts filter { post =>
+  lazy val progressPostsSorted: immutable.Seq[Post] = {
+    val progressPosts = allPosts filter { post =>
       !PageParts.isArticleOrTitlePostNr(post.nr) && post.shallAppendLast
     }
+    // Progress posts are always by time ascending. [PROGRTIME]
+    Post.sortPosts(progressPosts, PostSortOrder.OldestFirst)
+  }
 
   def allPosts: immutable.Seq[Post]
 
@@ -284,9 +289,10 @@ abstract class PageParts {
   }
 
 
-  def parentOf(postNr: PostNr): Option[Post] =
-    //thePostByNr(postNr).parentNr.map(id => thePostByNr(id))
-    postByNr(postNr).flatMap(_.parentNr.flatMap(id => postByNr(id)))
+  def parentOf(postNr: PostNr): Option[Post] = {
+    val anyPost: Option[Post] = postByNr(postNr)
+    anyPost.flatMap(_.parentNr.flatMap(nr => postByNr(nr)))
+  }
 
 
   def depthOf(postNr: PostNr): Int =

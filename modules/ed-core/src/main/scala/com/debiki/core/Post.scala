@@ -505,13 +505,6 @@ case class Post(   // [exp] ok use
   }
 
 
-  def parent(pageParts: PageParts): Option[Post] =
-    parentNr.flatMap(pageParts.postByNr)
-
-  def children(pageParts: PageParts): immutable.Seq[Post] =
-    pageParts.childrenSortedOf(nr)
-
-
   /** Setting any flag to true means that status will change to true. Leaving it
     * false means the status will remain unchanged (not that it'll be cleared).
     */
