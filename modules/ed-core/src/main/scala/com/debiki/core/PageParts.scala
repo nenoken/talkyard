@@ -289,9 +289,12 @@ abstract class PageParts {
   }
 
 
-  def parentOf(postNr: PostNr): Option[Post] = {
-    val anyPost: Option[Post] = postByNr(postNr)
-    anyPost.flatMap(_.parentNr.flatMap(nr => postByNr(nr)))
+  def parentOf(post: Post): Option[Post] = {
+    if (post.pageId != pageId) {
+      // Could fail an assertion, if debug.
+      return None
+    }
+    post.parentNr.flatMap(postByNr)
   }
 
 
@@ -305,7 +308,7 @@ abstract class PageParts {
     var curPost: Option[Post] = Some(thePostByNr(postNr))
     var numLaps = 0
     while ({
-      curPost = parentOf(curPost.get.nr)
+      curPost = parentOf(curPost.get)
       curPost.nonEmpty
     }) {
       numLaps += 1
