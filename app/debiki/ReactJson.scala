@@ -1178,6 +1178,10 @@ object JsonMaker {
       json += "showAuthorHow" -> JsNumber(settings.showAuthorHow.toInt)
     if (settings.watchbarStartsOpen != D.watchbarStartsOpen)
       json += "watchbarStartsOpen" -> JsBoolean(settings.watchbarStartsOpen)
+    // --- These and some more, could be in separate objs instead [DBLINHERIT]
+    // Because they'll be configurable per page type. And per category, and page?
+    // (I (KajMagnus) want my Dev Diary page at Ty .io in chrono order — and
+    // maybe only that page.)  Like the permission system.
     if (settings.discussionLayout != D.discussionLayout)
       json += "discussionLayout" -> JsNumber(settings.discussionLayout.toInt)
     if (settings.discPostNesting != D.discPostNesting)
@@ -1190,6 +1194,7 @@ object JsonMaker {
       json += "origPostReplyBtnTitle" -> JsString(settings.origPostReplyBtnTitle)
     if (settings.origPostVotes != D.origPostVotes)
       json += "origPostVotes" -> JsNumber(settings.origPostVotes.toInt)
+    // -----------------------------------------------------------------------
 
     json
   }
