@@ -1,7 +1,7 @@
 /// <reference path="../test-types.ts"/>
 
 import * as _ from 'lodash';
-import assert = require('assert');
+import assert = require('../utils/ty-assert');
 // import fs = require('fs');  EMBCMTS
 import server = require('../utils/server');
 import utils = require('../utils/utils');
@@ -70,7 +70,7 @@ describe("some-e2e-test  TyT1234ABC", () => {
       categoryId: forum.categories.categoryA.id,
       authorId: forum.members.mallory.id,
     });
-    assert(builder.getSite() === forum.siteData);
+    assert.refEq(builder.getSite(), forum.siteData);
     siteIdAddress = server.importSiteData(forum.siteData);
     siteId = siteIdAddress.id;
     server.skipRateLimits(siteId);

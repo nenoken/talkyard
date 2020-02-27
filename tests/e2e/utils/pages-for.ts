@@ -800,7 +800,7 @@ function pagesFor(browser) {
 
     // For one browser at a time only.
     // n starts on 1 not 0. -1 clicks the last, -2 the last but one etc.
-    waitAndClickNth: function(selector, n) {
+    waitAndClickNth: function(selector, n) {   // BUG will only scroll the 1st elem into view [05YKTDTH4]
       assert(n !== 0, "n starts on 1, change from 0 to 1 please");
       api._waitForClickable(selector);
       const items = browser.elements(selector).value;
@@ -3445,19 +3445,23 @@ function pagesFor(browser) {
       },
 
       isPostNrDescendantOf: function(postNr, maybeParentNr) {
+        api.switchToEmbCommentsIframeIfNeeded();
         return browser.isVisible(
             `#post-${maybeParentNr} + .dw-p-as + .dw-single-and-multireplies #post-${postNr}`);
       },
 
       isPostNrVisible: function(postNr) {
+        api.switchToEmbCommentsIframeIfNeeded();
         return browser.isVisible('#post-' + postNr);
       },
 
       waitForPostNrVisible: function(postNr) {
+        api.switchToEmbCommentsIframeIfNeeded();
         api.waitForVisible('#post-' + postNr);
       },
 
       waitForPostAssertTextMatches: function(postNr, text: string) {
+        api.switchToEmbCommentsIframeIfNeeded();
         /* // Only doing this:
         api.topic.waitForPostNrVisible(postNr);
         // sometimes causes this error: (here [402BMTJ4])
