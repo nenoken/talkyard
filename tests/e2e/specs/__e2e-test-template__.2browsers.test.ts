@@ -2,6 +2,7 @@
 
 import * as _ from 'lodash';
 import assert = require('assert');
+// import fs = require('fs');  EMBCMTS
 import server = require('../utils/server');
 import utils = require('../utils/utils');
 import { buildSite } from '../utils/site-builder';
@@ -111,7 +112,7 @@ describe("some-e2e-test  TyT1234ABC", () => {
     mariasBrowser.complex.loginWithPasswordViaTopbar(maria);
   });
 
-  // For embedded comments:
+  // For embedded comments:  EMBCMTS
   it("Creates an embedding page", () => {
     /*
     const dir = 'target';
