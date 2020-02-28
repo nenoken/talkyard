@@ -178,7 +178,7 @@ describe("emb-cmts-scroll-load-post  TyT603MRKH592S", () => {
         break;
 
       if (strangersBrowser.isVisible('.dw-x-show')) {
-        strangersBrowser.waitAndClickFirst('.dw-x-show');
+        strangersBrowser.waitAndClickFirst('.dw-x-show', { maybeMoves: true });
       }
 
       strangersBrowser.pause(125);

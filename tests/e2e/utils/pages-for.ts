@@ -1,5 +1,6 @@
 import _ = require('lodash');
 import assert = require('assert');
+import tyAssert = require('../utils/ty-assert');
 import logAndDie = require('./log-and-die');
 import path = require('path');
 import fs = require('fs');
@@ -24,9 +25,14 @@ const PollMaxMs = 5000;
 const enum IsWhere {
   Nowhere = 0,
   Forum = 1,
+
+  EmbFirst = 2,
   EmbeddingPage = 2,
   EmbCommentsIframe = 3,
   EmbEditorIframe = 4,
+  EmbLast = 4,
+
+  OtherTab = 5,
 };
 
 
@@ -369,6 +375,7 @@ function pagesFor(browser) {
           logMessage(`Calling browser.switchTab(id), id = ${id}...`);
           browser.switchTab(id);
           logMessage(`... done, current tab id is now: ${browser.getCurrentTabId()}.`);
+          isWhere = IsWhere.OtherTab;
           return;
         }
       }
@@ -405,6 +412,7 @@ function pagesFor(browser) {
         const idsAgain = browser.getTabIds();
         browser.switchTab(idsAgain[0]);
       }
+      api.__updateIsWhere();
     },
 
 
@@ -471,6 +479,20 @@ function pagesFor(browser) {
       const iframe = browser.element(selector).value;
       browser.frame(iframe);
       printBoringToStdout(` done, now in frame  ${selector}.\n`);
+    },
+
+
+    switchToLoginPopupIfEmbedded: () => {
+      if (IsWhere.EmbFirst <= isWhere && isWhere <= IsWhere.EmbLast ) {
+        api.swithToOtherTabOrWindow();
+      }
+    },
+
+
+    switchBackToFirstTabIfNeeded: () => {
+      if (isWhere === IsWhere.OtherTab) {
+        api.switchBackToFirstTabOrWindow();
+      }
     },
 
 
@@ -755,8 +777,8 @@ function pagesFor(browser) {
     },
 
 
-    waitAndClickFirst: function(selector: string) {
-      api._waitAndClickImpl(selector, { clickFirst: true });
+    waitAndClickFirst: function(selector: string, opts: { maybeMoves?: boolean } = {}) {
+      api._waitAndClickImpl(selector, { ...opts, clickFirst: true });
     },
 
 
@@ -1191,8 +1213,11 @@ function pagesFor(browser) {
     waitAndAssertVisibleTextMatches: function(selector, regex) {
       if (_.isString(regex)) regex = new RegExp(regex);
       const text = api.waitAndGetVisibleText(selector);
-      assert(regex.test(text), "'Elem selected by " + selector + "' didn't match " + regex.toString() +
-          ", actual text: '" + text + "'");
+      // This is easy to read:  [E2EEASYREAD]
+      assert(regex.test(text), '\n\n' +
+          `  Text of element selected by:  '${selector}'\n` +
+          `     should match:  ${regex.toString()}\n` +
+          `           but is:  "${text}"\n`);
     },
 
 
@@ -1277,6 +1302,7 @@ function pagesFor(browser) {
       assert(isResponseOk(response), "Bad response._status: " + response._status +
           ", state: " + response.state);
       const text = response.value;
+      // Could reformat, make simpler to read [E2EEASYREAD].
       assert(regex.test(text), "Elem " + n + " selected by '" + selector + "' doesn't match " +
           regex.toString() + ", actual text: '" + text + "'");
       // COULD use 'arguments' & a loop instead
@@ -1298,6 +1324,7 @@ function pagesFor(browser) {
           ", state: " + response.state);
       const regex = new RegExp(`\\b${classToFind}\\b`);
       const actuallClassAttr = response.value;
+      // Could reformat, make simpler to read [E2EEASYREAD].
       assert(regex.test(actuallClassAttr), "Elem " + n + " selected by '" + selector +
           "' doesn't have this class: '" + classToFind + "', instead it has: " +
           actuallClassAttr + "'");
@@ -1335,6 +1362,7 @@ function pagesFor(browser) {
         if (!many) {
           assert(!_.isArray(text), "Broken e2e test. Select only 1 elem please [EsE4KF0W2]");
         }
+        // Could reformat, make simpler to read [E2EEASYREAD].
         assert(regex.test(text), "Elem selected by '" + selector + "' didn't match " +
             regex.toString() + ", actual text: '" + text + whichBrowser);
         // COULD use 'arguments' & a loop instead
@@ -2141,8 +2169,15 @@ function pagesFor(browser) {
         api.loginDialog.tryLogin(username, password);
         if (opts && opts.resultInError)
           return;
-        api.waitUntilModalGone();
-        api.waitUntilLoadingOverlayGone();
+        if (isWhere === IsWhere.OtherTab) {
+          // Wait for this login popup tab/window to close.
+          api.waitForMaxBrowserTabs(1);
+          api.switchBackToFirstTabIfNeeded();
+        }
+        else {
+          api.waitUntilModalGone();
+          api.waitUntilLoadingOverlayGone();
+        }
       },
 
       loginWithEmailAndPassword: function(emailAddress: string, password: string, badLogin) {
@@ -3488,6 +3523,20 @@ function pagesFor(browser) {
         }
       },
 
+      assertPostOrderIs: function(expectedPostNrs: PostNr[], selector: string = '[id^="post-"]') {
+        // Replace other dupl code with this fn.  [59SKEDT0652]
+        api.switchToEmbCommentsIframeIfNeeded();
+        api.waitForVisible(selector);
+        const postElems = browser.elements(selector).value;
+        for (let i = 0; i < expectedPostNrs.length; ++i) {
+          const expectedNr = expectedPostNrs[i];
+          const elem = postElems[i];
+          const idAttr = browser.elementIdAttribute(elem.ELEMENT, 'id').value;
+          console.log(`id attr: ${idAttr}, expected nr: ${expectedNr}`);
+          tyAssert.eq(idAttr, `post-${expectedNr}`);
+        }
+      },
+
       postNrContains: function(postNr: PostNr, selector: string) {
         return browser.isExisting(api.topic.postBodySelector(postNr) + ' ' + selector);
       },
@@ -3690,20 +3739,37 @@ function pagesFor(browser) {
         return result;
       },
 
-      clickLikeVote: function(postNr: PostNr) {
+      clickLikeVote: function(postNr: PostNr, opts: { logInAs? } = {}) {
         const likeVoteSelector = api.topic.makeLikeVoteSelector(postNr);
-        api.topic.clickPostActionButton(likeVoteSelector);
+
+        utils.tryUntilTrue("click Like", 3, () => {
+          api.waitAndClick(likeVoteSelector);
+          if (!opts.logInAs || !api.isInIframe())
+            return true;
+          // A login popup should open.
+          browser.pause(200);
+          const ids = browser.getTabIds();
+          return ids.length >= 2;
+        });
+
+        if (opts.logInAs) {
+          api.switchToLoginPopupIfEmbedded();
+          api.loginDialog.loginWithPassword(opts.logInAs);
+          api.switchToEmbCommentsIframeIfNeeded();
+        }
       },
 
-      clickLikeVoteForBlogPost: function() {
+      clickLikeVoteForBlogPost: () => {
         api.switchToEmbCommentsIframeIfNeeded();
         api.waitAndClick('.dw-ar-t > .esPA > .dw-a-like');
       },
 
-      toggleLikeVote: function(postNr: PostNr) {
+      toggleLikeVote: function(postNr: PostNr, opts: { logInAs? } = {}) {
         const likeVoteSelector = api.topic.makeLikeVoteSelector(postNr);
+        api.switchToEmbCommentsIframeIfNeeded();
         const isLikedBefore = browser.isVisible(likeVoteSelector + '.dw-my-vote');
-        api.topic.clickLikeVote(postNr);
+        api.topic.clickLikeVote(postNr, opts);
+        api.switchToEmbCommentsIframeIfNeeded();
         let delay = 133;
         while (true) {
           // Wait for the server to reply and the page to get updated.
@@ -3951,7 +4017,12 @@ function pagesFor(browser) {
             api.topic._isBodyVisible(postNr);
       },
 
+      // Not needed? Just use  waitAndClick()  instead?
       clickPostActionButton: function(buttonSelector: string, opts: { clickFirst?: boolean } = {}) {   // RENAME to api.scrollAndClick?
+        api.switchToEmbCommentsIframeIfNeeded();
+        let hasScrolled = false;
+        const isInIframe = api.isInIframe();
+
         // If the button is close to the bottom of the window, the fixed bottom bar might
         // be above it; then, if it's below the [Scroll][Back] buttons, it won't be clickable.
         // Or the button might be below the lower window edge.
@@ -4004,7 +4075,6 @@ function pagesFor(browser) {
               //   bottomY = api.getRectOfFirst(api.scrollButtons.fixedBarSelector).y;
             }
 
-            const isInIframe = api.isInIframe();
             const topY = isInIframe
                 ? 0 : (    // no topbar
                   isOnAutoPage
@@ -4017,6 +4087,7 @@ function pagesFor(browser) {
             if (buttonMiddleY > topY + clickMargin && buttonMiddleY < bottomY - clickMargin)
               break;
 
+            // Not needed? Nowadays, _waitAndClickImpl() scrolls, if needed.
             logMessage(`Scrolling into view: ${buttonSelector}, topY = ${topY}, ` +
                 `buttonRect = ${JSON.stringify(buttonRect)}, buttonMiddleY = ${buttonMiddleY}, ` +
                 `bottomY: ${bottomY}`);
@@ -4028,11 +4099,17 @@ function pagesFor(browser) {
                 duration: 150,
               });
             }, buttonSelector, topY, scrollMargin);
+            hasScrolled = true;
             browser.pause(150 + 100);
           }
           try {
-            logMessage(`clickPostActionButton: CLICK ${buttonSelector} [TyME2ECLICK]`);
-            api._waitAndClickImpl(buttonSelector, opts);
+            // If in iframe, we might not have scrolled anything above, and will
+            // scroll later instead, so, then, the button will maybe be "moving" / scrolling.
+            const maybeMoves = hasScrolled || isInIframe;
+            const opts2 = { ...opts, maybeMoves };
+            logMessage(`clickPostActionButton:  CLICK  ${buttonSelector}  ` +
+                `${JSON.stringify(opts2)}  [TyME2ECLICK]`);
+            api._waitAndClickImpl(buttonSelector, opts2);
             break;
           }
           catch (exception) {
@@ -5356,6 +5433,35 @@ function pagesFor(browser) {
             api.waitAndClick('.s_AA_Us_Inv_SendB');
           },
         }
+      },
+
+      interface: {
+        goHere: (origin?: string, opts: { loginAs? } = {}) => {
+          api.adminArea._goToMaybeLogin(origin, '/-/admin/customize/basic', opts);
+        },
+
+        waitUntilLoaded: () => {
+          api.waitForVisible('.s_A_Ss_S');
+          // Top tab pane unmount bug workaround apparently not needed here. [5QKBRQ] [E2EBUG]
+          // Can be removed elsewhere too?
+        },
+
+        areTopicSectionSettingsVisible: () => {
+          return browser.isVisible('.e_DscPrgSct');
+        },
+
+        setSortOrder: (value: number) => {
+          api.waitAndSetValue('.e_BlgSrtOdr input', value, { checkAndRetry: true });
+        },
+
+        setBlogPostLikeVotes: (value: number) => {
+          api.waitAndSetValue('.e_BlgPstVts input', value, { checkAndRetry: true });
+        },
+
+        setAddCommentBtnTitle: (title: string) => {
+          api.waitAndSetValue('.e_AddCmtBtnTtl input', title, { checkAndRetry: true });
+        },
+
       },
 
       backupsTab: {

@@ -198,6 +198,23 @@ ${ htmlToPaste ? htmlToPaste : `
     }
     return fn();
   },
+
+
+  tryUntilTrue: function<R>(what, maxNumTimes, fn: () => boolean) {
+    for (let retryCount = 0; true; ++retryCount) {
+      if (retryCount === maxNumTimes)
+        throw Error(`Tried ${maxNumTimes} times but failed:  ${what}`)
+
+      try {
+        const done = fn();
+        if (done)
+          return;
+      }
+      catch (error) {
+        logUnusual(`RETRYING: ${what}  [TyME2ERETRY], because error: ${error.toString()}`);
+      }
+    }
+  },
 };
 
 
